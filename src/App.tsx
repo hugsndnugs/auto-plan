@@ -26,6 +26,10 @@ import {
 } from "@/lib/dates";
 import { anchorAfterSegmentMove } from "@/lib/dragAnchor";
 import {
+  durationMinutesFromWorkDays,
+  wholeWorkDaysFromDurationMinutes,
+} from "@/lib/workDayDuration";
+import {
   HIGH_PRIORITY_AUTO_START_OFFSET_DAYS,
   HIGH_SLIP_GRACE_DAYS,
   LOW_PRIORITY_OFFSET_DAYS,
@@ -324,33 +328,6 @@ export default function App() {
       </main>
     </div>
   );
-}
-
-function minutesPerWorkDay(settings: WorkSettings): number {
-  return Math.max(1, settings.workEndMinutes - settings.workStartMinutes);
-}
-
-/** Whole working days only — stored minutes are always N × (length of workday). */
-function durationMinutesFromWorkDays(
-  workDays: number,
-  settings: WorkSettings,
-): number {
-  const mpd = minutesPerWorkDay(settings);
-  const raw = Math.round(Number(workDays));
-  const days = Number.isFinite(raw)
-    ? Math.max(1, Math.min(500, raw))
-    : 1;
-  return Math.max(15, days * mpd);
-}
-
-/** How many whole working days best match stored minutes (for edit form). */
-function wholeWorkDaysFromDurationMinutes(
-  minutes: number,
-  settings: WorkSettings,
-): number {
-  const mpd = minutesPerWorkDay(settings);
-  if (minutes <= 0) return 1;
-  return Math.max(1, Math.min(500, Math.round(minutes / mpd)));
 }
 
 function AddJobForm({
