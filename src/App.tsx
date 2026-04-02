@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -37,6 +38,67 @@ import {
 } from "@/scheduler/priorityPolicy";
 import "./App.css";
 
+const BANNER_NAME_CAP = 4;
+
+function truncateNames(names: string[]): {
+  shown: string[];
+  rest: number;
+} {
+  if (names.length <= BANNER_NAME_CAP) {
+    return { shown: names, rest: 0 };
+  }
+  return {
+    shown: names.slice(0, BANNER_NAME_CAP),
+    rest: names.length - BANNER_NAME_CAP,
+  };
+}
+
+function OverflowBanner({ labels }: { labels: string[] }) {
+  const { shown, rest } = truncateNames(labels);
+  return (
+    <div className="banner" role="status">
+      <p className="banner__lead">
+        Not enough working time in the horizon for: {shown.join(", ")}
+        {rest > 0 ? ` +${rest} more` : ""}. Shorten a duration or adjust working
+        hours.
+      </p>
+      <details className="banner__details">
+        <summary>Why this appears</summary>
+        <p className="banner__detail-text">
+          Jobs are packed into about six months of working time from today (or
+          your visible range). If work does not fit, it is listed as overflow.
+        </p>
+      </details>
+    </div>
+  );
+}
+
+function SlipBanner({
+  banner,
+}: {
+  banner: {
+    kind: "urgent" | "high";
+    titles: string[];
+    summary: string;
+    detail: string;
+  };
+}) {
+  const { shown, rest } = truncateNames(banner.titles);
+  return (
+    <div className="banner banner--slip" role="status">
+      <p className="banner__lead">{banner.summary}</p>
+      <p className="banner__names">
+        {shown.join(", ")}
+        {rest > 0 ? ` +${rest} more` : ""}
+      </p>
+      <details className="banner__details">
+        <summary>Details</summary>
+        <p className="banner__detail-text">{banner.detail}</p>
+      </details>
+    </div>
+  );
+}
+
 export default function App() {
   const jobs = usePlannerStore((s) => s.jobs);
   const workSettings = usePlannerStore((s) => s.workSettings);
@@ -59,6 +121,18 @@ export default function App() {
   const selected = selectedId ? jobsById.get(selectedId) : undefined;
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const importDialogRef = useRef<HTMLDialogElement>(null);
+  const [pendingImportText, setPendingImportText] = useState<string | null>(
+    null,
+  );
+  const [toast, setToast] = useState<string | null>(null);
+  const [dataError, setDataError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(id);
+  }, [toast]);
 
   const overflowLabels = useMemo(
     () =>
@@ -68,25 +142,39 @@ export default function App() {
     [pack.placements, jobsById],
   );
 
-  const slipMessages = useMemo(() => {
-    const lines: string[] = [];
+  const slipBanners = useMemo(() => {
+    type SlipKind = "urgent" | "high";
+    const out: {
+      kind: SlipKind;
+      titles: string[];
+      summary: string;
+      detail: string;
+    }[] = [];
     const urgent = pack.placements
       .filter((p) => p.slip === "urgent")
       .map((p) => jobsById.get(p.jobId)?.title ?? p.jobId);
     const high = pack.placements
       .filter((p) => p.slip === "high")
       .map((p) => jobsById.get(p.jobId)?.title ?? p.jobId);
+    const urgentDays = Math.round(URGENT_FIRST_START_WITHIN_MS / 86400000);
     if (urgent.length > 0) {
-      lines.push(
-        `Urgent (aim for first work within ~${Math.round(URGENT_FIRST_START_WITHIN_MS / 86400000)} day): backlog pushed — ${urgent.join(", ")}`,
-      );
+      out.push({
+        kind: "urgent",
+        titles: urgent,
+        summary: `Urgent jobs are starting later than ~${urgentDays} day from now due to backlog.`,
+        detail: `Urgent tier aims for first work within about ${urgentDays} day from now. Preferred starts and older adds pack first within the same priority.`,
+      });
     }
     if (high.length > 0) {
-      lines.push(
-        `High (aim for auto-placed work to start ~${HIGH_PRIORITY_AUTO_START_OFFSET_DAYS} days after add; backlog if first work is more than ~${HIGH_SLIP_GRACE_DAYS} days after that window): ${high.join(", ")}`,
-      );
+      out.push({
+        kind: "high",
+        titles: high,
+        summary:
+          "Some High jobs start later than the usual auto-placement window (heavy backlog).",
+        detail: `High auto-placed work normally starts about ${HIGH_PRIORITY_AUTO_START_OFFSET_DAYS} days after you add the job unless you set a preferred start. The backlog alert appears if first work is more than about ${HIGH_SLIP_GRACE_DAYS} days after that window.`,
+      });
     }
-    return lines;
+    return out;
   }, [pack.placements, jobsById]);
 
   const periodLabel = useMemo(() => {
@@ -112,6 +200,8 @@ export default function App() {
     a.download = `auto-plan-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
+    setDataError(null);
+    setToast("Backup file downloaded.");
   }, [exportSnapshot]);
 
   const onMoveJob = useCallback(
@@ -134,22 +224,77 @@ export default function App() {
     [jobsById, pack.placements, updateJob],
   );
 
+  const resetFileInput = useCallback(() => {
+    if (fileRef.current) fileRef.current.value = "";
+  }, []);
+
+  const cancelPendingImport = useCallback(() => {
+    setPendingImportText(null);
+    resetFileInput();
+    importDialogRef.current?.close();
+  }, [resetFileInput]);
+
+  const confirmImport = useCallback(() => {
+    if (pendingImportText == null) return;
+    try {
+      importSnapshot(pendingImportText);
+      setSelectedId(null);
+      setDataError(null);
+      setToast("Backup imported. Your schedule was replaced.");
+      cancelPendingImport();
+    } catch (err: unknown) {
+      setDataError(
+        err instanceof Error ? err.message : "Could not read that backup file.",
+      );
+      cancelPendingImport();
+    }
+  }, [pendingImportText, importSnapshot, cancelPendingImport]);
+
   const onImportFile: ChangeEventHandler<HTMLInputElement> = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
     void f
       .text()
       .then((text) => {
-        importSnapshot(text);
-        setSelectedId(null);
+        setPendingImportText(text);
+        importDialogRef.current?.showModal();
       })
       .catch((err: unknown) => {
-        alert(err instanceof Error ? err.message : "Import failed");
-      })
-      .finally(() => {
-        e.target.value = "";
+        setDataError(
+          err instanceof Error ? err.message : "Could not read that file.",
+        );
+        resetFileInput();
       });
   };
+
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (importDialogRef.current?.open) return;
+      const t = ev.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      if (!ev.altKey) return;
+      if (ev.key === "ArrowLeft") {
+        ev.preventDefault();
+        shiftCalendar(-1);
+      } else if (ev.key === "ArrowRight") {
+        ev.preventDefault();
+        shiftCalendar(1);
+      } else if (ev.key === "t" || ev.key === "T") {
+        ev.preventDefault();
+        goToday();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [shiftCalendar, goToday]);
 
   return (
     <div className="app">
@@ -207,22 +352,68 @@ export default function App() {
             type="file"
             accept="application/json,.json"
             className="sr-only"
+            aria-label="Choose JSON backup file to import"
             onChange={onImportFile}
           />
+          <span className="toolbar-shortcut-hint" aria-hidden>
+            Alt+← → period · Alt+T today
+          </span>
         </div>
-      </header>
-
-      <aside className="app__aside">
-        {overflowLabels.length > 0 && (
-          <div className="banner" role="status">
-            Not enough working time in the horizon for:{" "}
-            {overflowLabels.join(", ")}. Shorten duration or extend the date range.
+        {toast && (
+          <div className="app__toast" role="status">
+            {toast}
           </div>
         )}
-        {slipMessages.map((msg, i) => (
-          <div key={`slip-${i}`} className="banner banner--slip" role="status">
-            {msg}
+      </header>
+
+      <dialog
+        ref={importDialogRef}
+        className="import-dialog"
+        aria-labelledby="import-dialog-title"
+        onCancel={(e) => {
+          e.preventDefault();
+          cancelPendingImport();
+        }}
+      >
+        <h2 id="import-dialog-title" className="import-dialog__title">
+          Replace all data?
+        </h2>
+        <p className="import-dialog__body">
+          Importing will replace every job and your working-hours settings in this
+          browser. This cannot be undone (except by importing another backup).
+        </p>
+        <div className="import-dialog__actions">
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={cancelPendingImport}
+          >
+            Cancel
+          </button>
+          <button type="button" className="btn btn--primary" onClick={confirmImport}>
+            Replace and import
+          </button>
+        </div>
+      </dialog>
+
+      <aside className="app__aside">
+        {dataError && (
+          <div className="banner banner--error" role="alert">
+            {dataError}{" "}
+            <button
+              type="button"
+              className="banner__dismiss"
+              onClick={() => setDataError(null)}
+            >
+              Dismiss
+            </button>
           </div>
+        )}
+        {overflowLabels.length > 0 && (
+          <OverflowBanner labels={overflowLabels} />
+        )}
+        {slipBanners.map((b) => (
+          <SlipBanner key={b.kind} banner={b} />
         ))}
 
         <section className="panel">
@@ -236,17 +427,23 @@ export default function App() {
         </section>
 
         <section className="panel">
-          <h2>Jobs</h2>
+          <h2 id="job-list-heading">Jobs</h2>
           {jobs.length === 0 ? (
             <p className="empty-hint">
               No jobs yet. Add one above — duration can span multiple working days.
             </p>
           ) : (
-            <ul className="job-list">
+            <ul
+              className="job-list"
+              role="listbox"
+              aria-labelledby="job-list-heading"
+            >
               {jobs.map((j) => (
-                <li key={j.id}>
+                <li key={j.id} role="presentation">
                   <button
                     type="button"
+                    role="option"
+                    aria-selected={selectedId === j.id}
                     data-active={selectedId === j.id}
                     onClick={() => setSelectedId(j.id)}
                   >
@@ -306,6 +503,11 @@ export default function App() {
       </aside>
 
       <main className="app__main">
+        {viewMode === "week" && jobs.length === 0 && (
+          <p className="main-empty-hint">
+            Add a job in the sidebar to see it packed on the week timeline.
+          </p>
+        )}
         {viewMode === "week" ? (
           <WeekGrid
             weekStartMs={viewRangeStartMs}
@@ -408,15 +610,17 @@ function AddJobForm({
         />
         Priority insert (Urgent)
       </label>
-      <p className="priority-hint">
-        Urgent and High are packed first (preferred start before auto-placed; then older adds first).
-        Low auto-starts
-        after ~{LOW_PRIORITY_OFFSET_DAYS} days unless you set a preferred start. High auto-starts
-        ~{HIGH_PRIORITY_AUTO_START_OFFSET_DAYS} days after you add the job unless you set a
-        preferred start. Alerts show if Urgent first work is later than ~
-        {Math.round(URGENT_FIRST_START_WITHIN_MS / 86400000)} day from now, or if High first work
-        is more than ~{HIGH_SLIP_GRACE_DAYS} days after that High window (backlog).
-      </p>
+      <details className="priority-hint-details">
+        <summary className="priority-hint-summary">How priority works</summary>
+        <p className="priority-hint">
+          Urgent and High are packed first (preferred start before auto-placed; then older adds
+          first). Low auto-starts after ~{LOW_PRIORITY_OFFSET_DAYS} days unless you set a preferred
+          start. High auto-starts ~{HIGH_PRIORITY_AUTO_START_OFFSET_DAYS} days after you add the
+          job unless you set a preferred start. Alerts show if Urgent first work is later than ~
+          {Math.round(URGENT_FIRST_START_WITHIN_MS / 86400000)} day from now, or if High first work
+          is more than ~{HIGH_SLIP_GRACE_DAYS} days after that High window (backlog).
+        </p>
+      </details>
       <button type="submit" className="btn btn--primary">
         Add to schedule
       </button>
@@ -447,15 +651,22 @@ function JobEditor({
   const [anchor, setAnchor] = useState(
     job.anchorStartMs != null ? toDatetimeLocalValue(job.anchorStartMs) : "",
   );
+  const [notes, setNotes] = useState(job.notes ?? "");
+  const [deadline, setDeadline] = useState(
+    job.deadlineMs != null ? toDatetimeLocalValue(job.deadlineMs) : "",
+  );
   const [earlyEnd, setEarlyEnd] = useState(toDatetimeLocalValue(Date.now()));
 
   const save = () => {
     const durationMinutes = durationMinutesFromWorkDays(workDays, workSettings);
+    const n = notes.trim();
     onSave({
       title: title.trim() || "Untitled",
       durationMinutes,
       priority,
       anchorStartMs: anchor ? fromDatetimeLocalValue(anchor) : null,
+      notes: n === "" ? undefined : n,
+      deadlineMs: deadline ? fromDatetimeLocalValue(deadline) : undefined,
     });
   };
 
@@ -508,6 +719,32 @@ function JobEditor({
           value={anchor}
           onChange={(e) => setAnchor(e.target.value)}
         />
+        <p className="field-hint">
+          On touch devices, use this (or Save after changing) instead of dragging blocks to
+          reschedule.
+        </p>
+      </div>
+      <div className="field">
+        <label htmlFor="ej-notes">Notes (optional)</label>
+        <textarea
+          id="ej-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Context, links, client name…"
+          rows={3}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="ej-deadline">Deadline (optional, reference only)</label>
+        <input
+          id="ej-deadline"
+          type="datetime-local"
+          value={deadline}
+          onChange={(e) => setDeadline(e.target.value)}
+        />
+        <p className="field-hint">
+          Does not change packing — for your own planning only.
+        </p>
       </div>
       <div className="row-actions">
         <button type="button" className="btn btn--primary" onClick={save}>
@@ -598,13 +835,19 @@ function SettingsForm({
         />
       </div>
       <div className="field">
-        <span>Working days</span>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+        <span id="workdays-label">Working days</span>
+        <div
+          className="workday-toggles"
+          role="group"
+          aria-labelledby="workdays-label"
+        >
           {dayNames.map((n, i) => (
             <button
               key={n}
               type="button"
-              className="btn"
+              className="btn workday-toggle"
+              aria-pressed={settings.workDays[i]}
+              aria-label={`${n} ${settings.workDays[i] ? "working day" : "day off"}`}
               style={{
                 opacity: settings.workDays[i] ? 1 : 0.45,
                 fontSize: "0.75rem",
