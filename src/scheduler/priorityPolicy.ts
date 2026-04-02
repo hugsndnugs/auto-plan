@@ -20,6 +20,25 @@ export const HIGH_PRIORITY_AUTO_START_OFFSET_MS =
 export const HIGH_SLIP_GRACE_MS = HIGH_SLIP_GRACE_DAYS * 86400000;
 
 /**
+ * High + planned + no anchor whose 14-day minimum start is still strictly in the future.
+ * These pack after other eligible jobs so they do not clear the near-term window for lower tiers.
+ */
+export function isDeferredAutoPlacedHigh(
+  job: Pick<Job, "priority" | "status" | "anchorStartMs" | "addedAtMs">,
+  nowMs: number,
+): boolean {
+  if (
+    job.priority !== 2 ||
+    job.status !== "planned" ||
+    job.anchorStartMs != null
+  ) {
+    return false;
+  }
+  const added = job.addedAtMs ?? nowMs;
+  return added + HIGH_PRIORITY_AUTO_START_OFFSET_MS > nowMs;
+}
+
+/**
  * Earliest instant we may start this job in the pack pass.
  * Low + planned + no anchor: defer so higher tiers get near-term capacity.
  * High + planned + no anchor: defer until `addedAtMs` + 14 calendar days (legacy: `addedAtMs` missing → `nowMs`).

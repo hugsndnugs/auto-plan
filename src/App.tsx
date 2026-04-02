@@ -10,9 +10,11 @@ import {
 import { useSchedule } from "@/hooks/useSchedule";
 import {
   PRIORITY_LABELS,
+  priorityOptionsForEditor,
   type Job,
   type Priority,
   type WorkSettings,
+  UI_SELECTABLE_PRIORITIES,
 } from "@/scheduler/types";
 import { usePlannerStore } from "@/store/plannerStore";
 import { MonthGrid } from "@/components/MonthGrid";
@@ -33,7 +35,6 @@ import {
 import {
   HIGH_PRIORITY_AUTO_START_OFFSET_DAYS,
   HIGH_SLIP_GRACE_DAYS,
-  LOW_PRIORITY_OFFSET_DAYS,
   URGENT_FIRST_START_WITHIN_MS,
 } from "@/scheduler/priorityPolicy";
 import "./App.css";
@@ -595,7 +596,7 @@ function AddJobForm({
           disabled={urgentInsert}
           onChange={(e) => setPriority(Number(e.target.value) as Priority)}
         >
-          {([0, 1, 2, 3] as const).map((k) => (
+          {UI_SELECTABLE_PRIORITIES.map((k) => (
             <option key={k} value={k}>
               {PRIORITY_LABELS[k]}
             </option>
@@ -613,12 +614,9 @@ function AddJobForm({
       <details className="priority-hint-details">
         <summary className="priority-hint-summary">How priority works</summary>
         <p className="priority-hint">
-          Urgent and High are packed first (preferred start before auto-placed; then older adds
-          first). Low auto-starts after ~{LOW_PRIORITY_OFFSET_DAYS} days unless you set a preferred
-          start. High auto-starts ~{HIGH_PRIORITY_AUTO_START_OFFSET_DAYS} days after you add the
-          job unless you set a preferred start. Alerts show if Urgent first work is later than ~
-          {Math.round(URGENT_FIRST_START_WITHIN_MS / 86400000)} day from now, or if High first work
-          is more than ~{HIGH_SLIP_GRACE_DAYS} days after that High window (backlog).
+          New jobs use <strong>Normal</strong> or <strong>Urgent</strong> (or Priority insert for
+          Urgent). Urgent packs first; Normal comes after Urgent work. Additional priority tiers are
+          reserved for a future release; the scheduler still understands them for imported data.
         </p>
       </details>
       <button type="submit" className="btn btn--primary">
@@ -704,7 +702,7 @@ function JobEditor({
           value={priority}
           onChange={(e) => setPriority(Number(e.target.value) as Priority)}
         >
-          {([0, 1, 2, 3] as const).map((k) => (
+          {priorityOptionsForEditor(priority).map((k) => (
             <option key={k} value={k}>
               {PRIORITY_LABELS[k]}
             </option>

@@ -288,6 +288,90 @@ describe("packJobs", () => {
     expect(placements[0].segments[0].startMs).toBe(MON_8);
   });
 
+  it("packs Normal before deferred auto High so near-term work is not displaced", () => {
+    const jobs: Job[] = [
+      job({
+        id: "n",
+        durationMinutes: 60,
+        priority: 1,
+        status: "planned",
+      }),
+      job({
+        id: "h",
+        durationMinutes: 60,
+        priority: 2,
+        status: "planned",
+        addedAtMs: MON_8,
+      }),
+    ];
+    const { placements } = packJobs(jobs, {
+      settings,
+      horizonStartMs: MON_8,
+      horizonEndMs: HORIZON_LONG,
+      nowMs: MON_8,
+    });
+    const n = placements.find((p) => p.jobId === "n")!;
+    const h = placements.find((p) => p.jobId === "h")!;
+    expect(n.segments[0].startMs).toBeLessThan(h.segments[0].startMs);
+    expect(h.segments[0].startMs).toBeGreaterThanOrEqual(
+      MON_8 + HIGH_PRIORITY_AUTO_START_OFFSET_MS,
+    );
+  });
+
+  it("still packs non-deferred High before Normal when 14-day floor is in the past", () => {
+    const jobs: Job[] = [
+      job({
+        id: "n",
+        durationMinutes: 60,
+        priority: 1,
+        status: "planned",
+      }),
+      job({
+        id: "h",
+        durationMinutes: 60,
+        priority: 2,
+        status: "planned",
+        addedAtMs: DEFAULT_ADDED_AT_MS,
+      }),
+    ];
+    const { placements } = packJobs(jobs, {
+      settings,
+      horizonStartMs: MON_8,
+      horizonEndMs: HORIZON_LONG,
+      nowMs: MON_8,
+    });
+    expect(placements[0].jobId).toBe("h");
+    expect(placements[1].jobId).toBe("n");
+  });
+
+  it("orders multiple deferred auto High jobs FIFO by addedAtMs in the tail group", () => {
+    const older = MON_8 - 2 * 86400000;
+    const newer = MON_8 - 86400000;
+    const jobs: Job[] = [
+      job({
+        id: "hNew",
+        durationMinutes: 60,
+        priority: 2,
+        status: "planned",
+        addedAtMs: newer,
+      }),
+      job({
+        id: "hOld",
+        durationMinutes: 60,
+        priority: 2,
+        status: "planned",
+        addedAtMs: older,
+      }),
+    ];
+    const { placements } = packJobs(jobs, {
+      settings,
+      horizonStartMs: MON_8,
+      horizonEndMs: HORIZON_LONG,
+      nowMs: MON_8,
+    });
+    expect(placements.map((p) => p.jobId)).toEqual(["hOld", "hNew"]);
+  });
+
   it("uses remaining minutes for in_progress", () => {
     const jobs: Job[] = [
       job({

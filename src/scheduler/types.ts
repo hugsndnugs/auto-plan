@@ -8,6 +8,15 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
   3: "Urgent",
 };
 
+/** Priorities offered in add-job UI; scheduler still supports full `Priority` range (e.g. imports). */
+export const UI_SELECTABLE_PRIORITIES = [1, 3] as const satisfies readonly Priority[];
+
+/** Dropdown options when editing: Normal + Urgent, plus current value if it is High/Low (legacy/import). */
+export function priorityOptionsForEditor(currentPriority: Priority): Priority[] {
+  const set = new Set<Priority>([...UI_SELECTABLE_PRIORITIES, currentPriority]);
+  return Array.from(set).sort((a, b) => a - b);
+}
+
 export interface WorkSettings {
   /** Minutes from local midnight (e.g. 480 = 08:00) */
   workStartMinutes: number;
