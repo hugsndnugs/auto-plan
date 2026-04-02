@@ -173,6 +173,36 @@ describe("packJobs", () => {
     expect(placements[1].jobId).toBe("long");
   });
 
+  it("packs in_progress before planned at the same priority", () => {
+    const jobs: Job[] = [
+      job({
+        id: "planned",
+        durationMinutes: 60,
+        priority: 1,
+        status: "planned",
+      }),
+      job({
+        id: "wip",
+        durationMinutes: 120,
+        priority: 1,
+        status: "in_progress",
+        progressMinutesConsumed: 0,
+      }),
+    ];
+    const { placements } = packJobs(jobs, {
+      settings,
+      horizonStartMs: MON_8,
+      horizonEndMs: HORIZON,
+      nowMs: MON_8,
+    });
+    expect(placements[0].jobId).toBe("wip");
+    expect(placements[1].jobId).toBe("planned");
+    const wipEnd = placements.find((p) => p.jobId === "wip")!.scheduledEndMs!;
+    expect(
+      placements.find((p) => p.jobId === "planned")!.segments[0].startMs,
+    ).toBeGreaterThanOrEqual(wipEnd);
+  });
+
   it("packs anchored jobs before unanchored at the same priority", () => {
     const jobs: Job[] = [
       job({

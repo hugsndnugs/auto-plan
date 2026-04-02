@@ -14,14 +14,18 @@ function remainingMinutes(job: Job): number {
 }
 
 /**
- * Within the same priority: jobs with a user anchor pack before auto-placed jobs,
- * so dragging to set an anchor can claim a slot ahead of older unanchored work.
- * Among anchored jobs, earlier anchor time first. Among unanchored, FIFO by addedAtMs.
- * Deferred auto High (14-day floor still in the future) are sorted only within their tail group;
- * see sortJobsForPack.
+ * Within the same priority: in-progress packs before planned (so the cursor reflects WIP first).
+ * Then jobs with a user anchor pack before auto-placed jobs, so dragging can claim a slot ahead
+ * of older unanchored work. Among anchored jobs, earlier anchor time first. Among unanchored,
+ * FIFO by addedAtMs. Deferred auto High (14-day floor still in the future) are sorted only
+ * within their tail group; see sortJobsForPack.
  */
 function compareJobsForPack(a: Job, b: Job): number {
   if (b.priority !== a.priority) return b.priority - a.priority;
+
+  const aWip = a.status === "in_progress";
+  const bWip = b.status === "in_progress";
+  if (aWip !== bWip) return aWip ? -1 : 1;
 
   const aAnchored = a.anchorStartMs != null;
   const bAnchored = b.anchorStartMs != null;
@@ -59,8 +63,8 @@ export interface PackOptions {
 }
 
 /**
- * Packs active jobs (planned + in_progress) in priority order; within a tier, FIFO by addedAtMs
- * (then anchor, then id). Sequential cursor respects anchors.
+ * Packs active jobs (planned + in_progress) in priority order; within a tier, in-progress first,
+ * then anchored before unanchored, FIFO by addedAtMs (then id). Sequential cursor respects anchors.
  */
 export function packJobs(jobs: Job[], options: PackOptions): PackResult {
   const { settings, horizonStartMs, horizonEndMs, nowMs } = options;

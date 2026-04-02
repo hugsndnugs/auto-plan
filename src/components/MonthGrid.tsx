@@ -161,7 +161,6 @@ export function MonthGrid({
                       }}
                       onDragEnd={clearDropHighlight}
                       onDragOver={(ev) => onCellDragOver(ev, dayStartMs, isWork)}
-                      onDrop={(ev) => onCellDrop(ev, dayStartMs, isWork)}
                     >
                       <button
                         type="button"

@@ -42,7 +42,8 @@ export function anchorAfterSegmentMove(
   const sorted = [...placement.segments].sort((a, b) => a.startMs - b.startMs);
   const first = sorted[0];
   const delta = dropStartMs - draggedSegmentStartMs;
-  return first.startMs + delta;
+  const raw = first.startMs + delta;
+  return snapMsToQuarterHour(raw);
 }
 
 export function timeAtTrackY(

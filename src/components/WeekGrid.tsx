@@ -175,7 +175,6 @@ export function WeekGrid({
                         }}
                         title={`${job?.title ?? seg.jobId} · ${formatTime(clipStart)}–${formatTime(clipEnd)}${drag ? " — drag to reschedule" : ""}`}
                         onDragOver={(e) => onColumnDragOver(e, dayStartMs, isWork)}
-                        onDrop={(e) => onColumnDrop(e, dayStartMs, isWork)}
                       >
                         <button
                           type="button"
