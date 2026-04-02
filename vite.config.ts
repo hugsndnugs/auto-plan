@@ -5,11 +5,11 @@ import react from "@vitejs/plugin-react";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// GitHub Pages project site: https://<user>.github.io/<repo>/
-const repo = process.env.GITHUB_REPOSITORY?.split("/")[1];
-const base =
-  process.env.VITE_BASE_PATH ??
-  (process.env.CI && repo ? `/${repo}/` : "/");
+// Relative base so one build works for:
+// - Custom domains (site at domain root)
+// - GitHub Pages project URLs https://<user>.github.io/<repo>/
+// Override with VITE_BASE_PATH if needed (e.g. absolute "/my-repo/").
+const base = process.env.VITE_BASE_PATH ?? "./";
 
 export default defineConfig({
   plugins: [react()],

@@ -29,9 +29,9 @@ npm test
 
 1. Push this repository to GitHub.
 2. In the repo **Settings → Pages → Build and deployment**, set **Source** to **GitHub Actions**.
-3. The workflow in `.github/workflows/pages.yml` builds with `npm run build` and deploys the `dist` folder. The site base path is set from `GITHUB_REPOSITORY` so project URLs like `https://<user>.github.io/<repo>/` resolve assets correctly.
+3. The workflow in `.github/workflows/pages.yml` builds with `npm run build` and deploys the `dist` folder. Assets use a **relative** Vite base (`./`) so the same build works for **custom domains** (site at the domain root) and for default GitHub Pages URLs like `https://<user>.github.io/<repo>/`.
 
-For a **local** build with the same base as production, set `GITHUB_REPOSITORY` when building (for example `owner/auto-plan`).
+To force an absolute base path, set `VITE_BASE_PATH` when building (for example `VITE_BASE_PATH=/my-repo/`).
 
 ## How scheduling works
 
