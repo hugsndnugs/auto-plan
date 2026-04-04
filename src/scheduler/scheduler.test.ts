@@ -87,6 +87,24 @@ describe("buildSegments", () => {
     const { overflow } = buildSegments("a", MON_8, 10000, settings, short);
     expect(overflow).toBe(true);
   });
+
+  it("treats inverted work hours as a minimal valid window (no infinite loop)", () => {
+    const inverted: WorkSettings = {
+      workStartMinutes: 17 * 60,
+      workEndMinutes: 8 * 60,
+      workDays: [false, true, true, true, true, true, false],
+    };
+    const { segments, overflow } = buildSegments(
+      "a",
+      MON_8,
+      60,
+      inverted,
+      HORIZON,
+    );
+    expect(overflow).toBe(false);
+    expect(segments.length).toBeGreaterThanOrEqual(1);
+    expect(segments[0].endMs).toBeGreaterThan(segments[0].startMs);
+  });
 });
 
 describe("packJobs", () => {

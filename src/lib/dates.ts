@@ -40,8 +40,10 @@ export function toDatetimeLocalValue(ms: number): string {
   return `${y}-${m}-${day}T${h}:${min}`;
 }
 
+/** Parses a `datetime-local` value; returns **NaN** if the browser cannot parse it. */
 export function fromDatetimeLocalValue(s: string): number {
-  return new Date(s).getTime();
+  const t = new Date(s).getTime();
+  return Number.isFinite(t) ? t : Number.NaN;
 }
 
 /** First day of the calendar month containing `ms`, local midnight. */

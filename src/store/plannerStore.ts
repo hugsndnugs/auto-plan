@@ -1,24 +1,21 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type { Job, WorkSettings } from "@/scheduler/types";
 import {
   addMonthsLocal,
   startOfMonthLocal,
   startOfWeekMonday,
 } from "@/lib/dates";
+import {
+  assertValidPlannerSnapshot,
+  MAX_BACKUP_JSON_CHARS,
+  sanitizePersistedPlannerSlice,
+} from "@/lib/snapshotValidation";
+import { createSafeLocalStorage } from "@/lib/persistStorage";
 import { defaultWorkSettings } from "@/scheduler/workWindows";
+import type { PlannerSnapshot, ViewMode } from "./plannerTypes";
 
-export type ViewMode = "week" | "month";
-
-export interface PlannerSnapshot {
-  version: 1;
-  jobs: Job[];
-  workSettings: WorkSettings;
-  /** Legacy: Monday 00:00; prefer viewRangeStartMs in new exports */
-  viewWeekStartMs?: number;
-  viewRangeStartMs?: number;
-  viewMode?: ViewMode;
-}
+export type { ViewMode, PlannerSnapshot } from "./plannerTypes";
 
 export interface PlannerState {
   jobs: Job[];
@@ -124,25 +121,31 @@ export const usePlannerStore = create<PlannerState>()(
       },
 
       importSnapshot: (json) => {
-        const data = JSON.parse(json) as PlannerSnapshot;
-        if (data.version !== 1 || !Array.isArray(data.jobs)) {
+        if (json.length > MAX_BACKUP_JSON_CHARS) {
+          throw new Error(
+            `Backup file is too large (max ${MAX_BACKUP_JSON_CHARS} characters).`,
+          );
+        }
+        let data: unknown;
+        try {
+          data = JSON.parse(json);
+        } catch {
           throw new Error("Invalid backup file");
         }
-        const range =
-          data.viewRangeStartMs ??
-          data.viewWeekStartMs ??
-          startOfWeekMonday(Date.now()).getTime();
+        const snap = assertValidPlannerSnapshot(data);
         set({
-          jobs: data.jobs,
-          workSettings: data.workSettings ?? defaultWorkSettings(),
-          viewRangeStartMs: range,
-          viewMode: data.viewMode ?? "week",
+          jobs: snap.jobs,
+          workSettings: snap.workSettings,
+          viewRangeStartMs: snap.viewRangeStartMs,
+          viewMode: snap.viewMode,
         });
       },
     }),
     {
       name: "auto-plan-storage",
-      version: 3,
+      /** Re-run migrate for existing v3 stores so persisted data is sanitized once. */
+      version: 4,
+      storage: createJSONStorage(() => createSafeLocalStorage()),
       migrate: (persisted, version) => {
         if (persisted == null || typeof persisted !== "object") {
           return persisted as PlannerState;
@@ -152,7 +155,7 @@ export const usePlannerStore = create<PlannerState>()(
         if (version < 2) {
           const vw = p.viewWeekStartMs ?? p.viewRangeStartMs;
           const range =
-            typeof vw === "number"
+            typeof vw === "number" && Number.isFinite(vw)
               ? vw
               : startOfWeekMonday(Date.now()).getTime();
           p = {
@@ -165,13 +168,20 @@ export const usePlannerStore = create<PlannerState>()(
         if (version < 3) {
           const jobs = Array.isArray(p.jobs)
             ? (p.jobs as Job[]).map((j) =>
-                j.addedAtMs != null ? j : { ...j, addedAtMs: Date.now() },
+                j.addedAtMs == null ? { ...j, addedAtMs: Date.now() } : j,
               )
             : [];
           p = { ...p, jobs };
         }
 
-        return p as unknown as PlannerState;
+        const safe = sanitizePersistedPlannerSlice(p);
+        return {
+          ...p,
+          jobs: safe.jobs,
+          workSettings: safe.workSettings,
+          viewRangeStartMs: safe.viewRangeStartMs,
+          viewMode: safe.viewMode,
+        } as unknown as PlannerState;
       },
       partialize: (s) => ({
         jobs: s.jobs,

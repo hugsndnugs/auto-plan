@@ -40,6 +40,10 @@ export function buildSegments(
     const effectiveStart = aligned;
     const availableMin = (w.endMs - effectiveStart) / 60000;
     const take = Math.min(remaining, availableMin);
+    if (!Number.isFinite(take) || take <= 0) {
+      cursor = dayStart + 86400000;
+      continue;
+    }
     const endMs = effectiveStart + take * 60000;
 
     segments.push({ jobId, startMs: effectiveStart, endMs });

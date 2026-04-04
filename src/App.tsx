@@ -37,6 +37,8 @@ import {
   HIGH_SLIP_GRACE_DAYS,
   URGENT_FIRST_START_WITHIN_MS,
 } from "@/scheduler/priorityPolicy";
+import { MAX_BACKUP_JSON_CHARS } from "@/lib/snapshotValidation";
+import { STORAGE_QUOTA_EVENT } from "@/lib/persistStorage";
 import "./App.css";
 
 const BANNER_NAME_CAP = 4;
@@ -134,6 +136,16 @@ export default function App() {
     const id = window.setTimeout(() => setToast(null), 4000);
     return () => window.clearTimeout(id);
   }, [toast]);
+
+  useEffect(() => {
+    const onQuota = () => {
+      setToast(
+        "Browser storage is full. Export a backup, then free space or use another browser profile.",
+      );
+    };
+    window.addEventListener(STORAGE_QUOTA_EVENT, onQuota);
+    return () => window.removeEventListener(STORAGE_QUOTA_EVENT, onQuota);
+  }, []);
 
   const overflowLabels = useMemo(
     () =>
@@ -257,6 +269,13 @@ export default function App() {
     void f
       .text()
       .then((text) => {
+        if (text.length > MAX_BACKUP_JSON_CHARS) {
+          setDataError(
+            `That file is too large (max ${MAX_BACKUP_JSON_CHARS} characters).`,
+          );
+          resetFileInput();
+          return;
+        }
         setPendingImportText(text);
         importDialogRef.current?.showModal();
       })
@@ -654,17 +673,37 @@ function JobEditor({
     job.deadlineMs != null ? toDatetimeLocalValue(job.deadlineMs) : "",
   );
   const [earlyEnd, setEarlyEnd] = useState(toDatetimeLocalValue(Date.now()));
+  const [formError, setFormError] = useState<string | null>(null);
 
   const save = () => {
+    setFormError(null);
     const durationMinutes = durationMinutesFromWorkDays(workDays, workSettings);
     const n = notes.trim();
+    let anchorStartMs: number | null = null;
+    if (anchor) {
+      const t = fromDatetimeLocalValue(anchor);
+      if (!Number.isFinite(t)) {
+        setFormError("Preferred start is not a valid date and time.");
+        return;
+      }
+      anchorStartMs = t;
+    }
+    let deadlineMs: number | undefined;
+    if (deadline) {
+      const t = fromDatetimeLocalValue(deadline);
+      if (!Number.isFinite(t)) {
+        setFormError("Deadline is not a valid date and time.");
+        return;
+      }
+      deadlineMs = t;
+    }
     onSave({
       title: title.trim() || "Untitled",
       durationMinutes,
       priority,
-      anchorStartMs: anchor ? fromDatetimeLocalValue(anchor) : null,
+      anchorStartMs,
       notes: n === "" ? undefined : n,
-      deadlineMs: deadline ? fromDatetimeLocalValue(deadline) : undefined,
+      deadlineMs,
     });
   };
 
@@ -744,6 +783,11 @@ function JobEditor({
           Does not change packing — for your own planning only.
         </p>
       </div>
+      {formError && (
+        <p className="field-hint" role="alert">
+          {formError}
+        </p>
+      )}
       <div className="row-actions">
         <button type="button" className="btn btn--primary" onClick={save}>
           Save
@@ -767,7 +811,15 @@ function JobEditor({
             <button
               type="button"
               className="btn"
-              onClick={() => onFinishEarly(fromDatetimeLocalValue(earlyEnd))}
+              onClick={() => {
+                const t = fromDatetimeLocalValue(earlyEnd);
+                if (!Number.isFinite(t)) {
+                  setFormError("Finish time is not a valid date and time.");
+                  return;
+                }
+                setFormError(null);
+                onFinishEarly(t);
+              }}
             >
               Mark done (early or on time)
             </button>
@@ -870,5 +922,7 @@ function minutesToTime(m: number): string {
 
 function timeToMinutes(s: string): number {
   const [a, b] = s.split(":").map(Number);
-  return a * 60 + b;
+  const t = a * 60 + b;
+  if (!Number.isFinite(t)) return 8 * 60;
+  return Math.max(0, Math.min(24 * 60, Math.floor(t)));
 }

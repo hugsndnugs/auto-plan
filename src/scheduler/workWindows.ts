@@ -13,12 +13,22 @@ export function getDayWorkBounds(
   const d = new Date(dayStartMs);
   const wd = d.getDay();
   if (!settings.workDays[wd]) return null;
+  let startMin = settings.workStartMinutes;
+  let endMin = settings.workEndMinutes;
+  if (!Number.isFinite(startMin)) startMin = 8 * 60;
+  if (!Number.isFinite(endMin)) endMin = 17 * 60;
+  startMin = Math.max(0, Math.min(24 * 60 - 1, Math.floor(startMin)));
+  endMin = Math.max(1, Math.min(24 * 60, Math.floor(endMin)));
+  if (endMin <= startMin) {
+    endMin = Math.min(24 * 60, startMin + 60);
+  }
+
   const start = new Date(dayStartMs);
   start.setHours(0, 0, 0, 0);
-  start.setMinutes(settings.workStartMinutes);
+  start.setMinutes(startMin);
   const end = new Date(dayStartMs);
   end.setHours(0, 0, 0, 0);
-  end.setMinutes(settings.workEndMinutes);
+  end.setMinutes(endMin);
   return { startMs: start.getTime(), endMs: end.getTime() };
 }
 

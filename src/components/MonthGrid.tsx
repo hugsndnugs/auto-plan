@@ -84,7 +84,13 @@ export function MonthGrid({
       } catch {
         return;
       }
-      if (!parsed.jobId || typeof parsed.segmentStartMs !== "number") return;
+      if (
+        !parsed.jobId ||
+        typeof parsed.segmentStartMs !== "number" ||
+        !Number.isFinite(parsed.segmentStartMs)
+      ) {
+        return;
+      }
 
       const trackEl = (e.target as HTMLElement).closest(".month-grid__drop-track");
       if (!trackEl) return;
