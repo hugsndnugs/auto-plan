@@ -200,6 +200,13 @@
   font-weight: 600;
 }
 
+.add-job-form__submit {
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: 0.65rem;
+  touch-action: manipulation;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

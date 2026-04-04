@@ -249,6 +249,14 @@ export default function App() {
     [jobsById, pack.placements, updateJob],
   );
 
+  const onAddJob = useCallback(
+    (fields: Omit<Job, "id">) => {
+      addJob(fields);
+      if (narrowLayout) setMobileTab("schedule");
+    },
+    [addJob, narrowLayout],
+  );
+
   const resetFileInput = useCallback(() => {
     if (fileRef.current) fileRef.current.value = "";
   }, []);
@@ -448,12 +456,7 @@ export default function App() {
 
         <section className="panel">
           <h2>Add job</h2>
-          <AddJobForm
-            workSettings={workSettings}
-            onAdd={(fields) => {
-              addJob(fields);
-            }}
-          />
+          <AddJobForm workSettings={workSettings} onAdd={onAddJob} />
         </section>
 
         <section className="panel">
@@ -634,8 +637,7 @@ function AddJobForm({
   const [priority, setPriority] = useState<Priority>(1);
   const [urgentInsert, setUrgentInsert] = useState(false);
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
+  const commitAdd = useCallback(() => {
     const durationMinutes = durationMinutesFromWorkDays(workDays, workSettings);
     const pri = urgentInsert ? 3 : priority;
     onAdd({
@@ -647,10 +649,15 @@ function AddJobForm({
     });
     setTitle("");
     setUrgentInsert(false);
+  }, [workDays, workSettings, urgentInsert, priority, title, onAdd]);
+
+  const onFormSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    commitAdd();
   };
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={onFormSubmit}>
       <div className="field">
         <label htmlFor="title">Title</label>
         <input
@@ -658,6 +665,7 @@ function AddJobForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Client install"
+          enterKeyHint="next"
         />
       </div>
       <div className="field">
@@ -665,10 +673,12 @@ function AddJobForm({
         <input
           id="duration-days"
           type="number"
+          inputMode="numeric"
           min={1}
           max={500}
           step={1}
           value={workDays}
+          enterKeyHint="done"
           onChange={(e) => {
             const v = Number(e.target.value);
             setWorkDays(
@@ -708,7 +718,11 @@ function AddJobForm({
           reserved for a future release; the scheduler still understands them for imported data.
         </p>
       </details>
-      <button type="submit" className="btn btn--primary">
+      <button
+        type="button"
+        className="btn btn--primary add-job-form__submit"
+        onClick={commitAdd}
+      >
         Add to schedule
       </button>
     </form>
