@@ -869,6 +869,27 @@
   .job-list {
     max-height: min(50vh, 320px);
   }
+
+  .month-grid__chip-row {
+    min-height: 2.25rem;
+  }
+
+  .month-grid__chip {
+    min-height: 2.25rem;
+  }
+
+  .month-grid__chip-move {
+    min-width: 2.125rem;
+    max-width: 2.25rem;
+    padding: 0 0.1rem;
+    font-size: 0.5rem;
+  }
+
+  .seg__move {
+    min-width: 2.125rem;
+    min-height: 2.25rem;
+    font-size: 0.55rem;
+  }
 }
 
 .app .btn,

@@ -225,7 +225,8 @@ describe("packJobs", () => {
     ).toBeGreaterThanOrEqual(wipEnd);
   });
 
-  it("packs anchored jobs before unanchored at the same priority", () => {
+  it("lists pinned jobs before floating in pack output but schedules floating earlier on the calendar when the anchor is later", () => {
+    const friAnchor = MON_8 + 4 * 86400000;
     const jobs: Job[] = [
       job({
         id: "auto",
@@ -241,7 +242,7 @@ describe("packJobs", () => {
         priority: 1,
         status: "planned",
         addedAtMs: DEFAULT_ADDED_AT_MS,
-        anchorStartMs: MON_8 + 4 * 3600000,
+        anchorStartMs: friAnchor,
       }),
     ];
     const { placements } = packJobs(jobs, {
@@ -252,6 +253,12 @@ describe("packJobs", () => {
     });
     expect(placements[0].jobId).toBe("pinned");
     expect(placements[1].jobId).toBe("auto");
+    const auto = placements.find((p) => p.jobId === "auto")!;
+    const pinned = placements.find((p) => p.jobId === "pinned")!;
+    expect(auto.segments[0].startMs).toBeLessThan(pinned.segments[0].startMs);
+    expect(startOfLocalDay(auto.segments[0].startMs).getTime()).toBe(
+      startOfLocalDay(MON_8).getTime(),
+    );
   });
 
   it("respects sequential cursor after multi-day job", () => {
