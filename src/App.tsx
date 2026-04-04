@@ -18,7 +18,12 @@ import {
 } from "@/scheduler/types";
 import { usePlannerStore } from "@/store/plannerStore";
 import { MonthGrid } from "@/components/MonthGrid";
+import { SegmentMoveDialog } from "@/components/SegmentMoveDialog";
 import { WeekGrid } from "@/components/WeekGrid";
+import {
+  useMediaQuery,
+  usePreferTouchMoveControls,
+} from "@/hooks/useMediaQuery";
 import {
   formatDayLabel,
   formatMonthYear,
@@ -130,6 +135,13 @@ export default function App() {
   );
   const [toast, setToast] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [moveTarget, setMoveTarget] = useState<{
+    jobId: string;
+    segmentStartMs: number;
+  } | null>(null);
+  const narrowLayout = useMediaQuery("(max-width: 960px)");
+  const [mobileTab, setMobileTab] = useState<"schedule" | "jobs">("schedule");
+  const touchMoveControls = usePreferTouchMoveControls();
 
   useEffect(() => {
     if (!toast) return;
@@ -317,6 +329,7 @@ export default function App() {
   }, [shiftCalendar, goToday]);
 
   return (
+    <>
     <div className="app">
       <header className="app__header">
         <h1 className="app__title">Auto Plan</h1>
@@ -375,9 +388,11 @@ export default function App() {
             aria-label="Choose JSON backup file to import"
             onChange={onImportFile}
           />
-          <span className="toolbar-shortcut-hint" aria-hidden>
-            Alt+← → period · Alt+T today
-          </span>
+          {!touchMoveControls && (
+            <span className="toolbar-shortcut-hint" aria-hidden>
+              Alt+← → period · Alt+T today
+            </span>
+          )}
         </div>
         {toast && (
           <div className="app__toast" role="status">
@@ -386,37 +401,32 @@ export default function App() {
         )}
       </header>
 
-      <dialog
-        ref={importDialogRef}
-        className="import-dialog"
-        aria-labelledby="import-dialog-title"
-        onCancel={(e) => {
-          e.preventDefault();
-          cancelPendingImport();
-        }}
-      >
-        <h2 id="import-dialog-title" className="import-dialog__title">
-          Replace all data?
-        </h2>
-        <p className="import-dialog__body">
-          Importing will replace every job and your working-hours settings in this
-          browser. This cannot be undone (except by importing another backup).
-        </p>
-        <div className="import-dialog__actions">
+      {narrowLayout && (
+        <div className="mobile-tab-bar" role="tablist" aria-label="Main panels">
           <button
             type="button"
-            className="btn btn--ghost"
-            onClick={cancelPendingImport}
+            role="tab"
+            className={`mobile-tab-bar__btn${mobileTab === "schedule" ? " mobile-tab-bar__btn--active" : ""}`}
+            aria-selected={mobileTab === "schedule"}
+            onClick={() => setMobileTab("schedule")}
           >
-            Cancel
+            Schedule
           </button>
-          <button type="button" className="btn btn--primary" onClick={confirmImport}>
-            Replace and import
+          <button
+            type="button"
+            role="tab"
+            className={`mobile-tab-bar__btn${mobileTab === "jobs" ? " mobile-tab-bar__btn--active" : ""}`}
+            aria-selected={mobileTab === "jobs"}
+            onClick={() => setMobileTab("jobs")}
+          >
+            Jobs
           </button>
         </div>
-      </dialog>
+      )}
 
-      <aside className="app__aside">
+      <aside
+        className={`app__aside${narrowLayout && mobileTab === "schedule" ? " app__panel--mobile-hidden" : ""}`}
+      >
         {dataError && (
           <div className="banner banner--error" role="alert">
             {dataError}{" "}
@@ -522,21 +532,27 @@ export default function App() {
         </section>
       </aside>
 
-      <main className="app__main">
+      <main
+        className={`app__main${narrowLayout && mobileTab === "jobs" ? " app__panel--mobile-hidden" : ""}`}
+      >
         {viewMode === "week" && jobs.length === 0 && (
           <p className="main-empty-hint">
             Add a job in the sidebar to see it packed on the week timeline.
           </p>
         )}
         {viewMode === "week" ? (
-          <WeekGrid
-            weekStartMs={viewRangeStartMs}
-            segments={pack.allSegments}
-            jobsById={jobsById}
-            workSettings={workSettings}
-            onSelectJob={(id) => setSelectedId(id)}
-            onMoveJob={onMoveJob}
-          />
+          <div className="week-grid-scroll">
+            <WeekGrid
+              weekStartMs={viewRangeStartMs}
+              segments={pack.allSegments}
+              jobsById={jobsById}
+              workSettings={workSettings}
+              onSelectJob={(id) => setSelectedId(id)}
+              onMoveJob={onMoveJob}
+              touchMoveControls={touchMoveControls}
+              onOpenSegmentMove={setMoveTarget}
+            />
+          </div>
         ) : (
           <MonthGrid
             monthStartMs={viewRangeStartMs}
@@ -545,10 +561,64 @@ export default function App() {
             workSettings={workSettings}
             onSelectJob={(id) => setSelectedId(id)}
             onMoveJob={onMoveJob}
+            touchMoveControls={touchMoveControls}
+            onOpenSegmentMove={setMoveTarget}
           />
         )}
       </main>
     </div>
+
+    <dialog
+      ref={importDialogRef}
+      className="import-dialog"
+      aria-labelledby="import-dialog-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        cancelPendingImport();
+      }}
+    >
+      <h2 id="import-dialog-title" className="import-dialog__title">
+        Replace all data?
+      </h2>
+      <p className="import-dialog__body">
+        Importing will replace every job and your working-hours settings in this
+        browser. This cannot be undone (except by importing another backup).
+      </p>
+      <div className="import-dialog__actions">
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={cancelPendingImport}
+        >
+          Cancel
+        </button>
+        <button type="button" className="btn btn--primary" onClick={confirmImport}>
+          Replace and import
+        </button>
+      </div>
+    </dialog>
+
+    <SegmentMoveDialog
+      open={moveTarget !== null}
+      jobTitle={
+        moveTarget
+          ? (jobsById.get(moveTarget.jobId)?.title ?? moveTarget.jobId)
+          : ""
+      }
+      segmentStartMs={moveTarget?.segmentStartMs ?? 0}
+      workSettings={workSettings}
+      onClose={() => setMoveTarget(null)}
+      onApply={(dropStartMs) => {
+        if (!moveTarget) return;
+        onMoveJob({
+          jobId: moveTarget.jobId,
+          draggedSegmentStartMs: moveTarget.segmentStartMs,
+          dropStartMs,
+        });
+        setMoveTarget(null);
+      }}
+    />
+    </>
   );
 }
 
@@ -757,8 +827,7 @@ function JobEditor({
           onChange={(e) => setAnchor(e.target.value)}
         />
         <p className="field-hint">
-          On touch devices, use this (or Save after changing) instead of dragging blocks to
-          reschedule.
+          You can also use the Move button on the calendar or drag blocks on a desktop browser.
         </p>
       </div>
       <div className="field">

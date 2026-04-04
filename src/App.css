@@ -71,6 +71,92 @@
   border-top: 1px solid var(--border);
 }
 
+.segment-move-dialog {
+  max-width: min(26rem, calc(100vw - 2rem));
+  width: calc(100vw - 2rem);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.segment-move-dialog::backdrop {
+  background: rgba(8, 12, 18, 0.72);
+}
+
+.segment-move-dialog__title {
+  margin: 0;
+  padding: 1rem 1.25rem 0;
+  font-size: 1.05rem;
+  font-family: var(--font-display);
+}
+
+.segment-move-dialog__body {
+  margin: 0;
+  padding: 0.65rem 1.25rem 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.segment-move-dialog__field {
+  padding: 0.75rem 1.25rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.segment-move-dialog__field label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.segment-move-dialog__field input {
+  font-size: 1rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.segment-move-dialog__error {
+  margin: 0.5rem 1.25rem 0;
+  font-size: 0.85rem;
+  color: #f07178;
+}
+
+.segment-move-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem 1.1rem;
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.mobile-tab-bar {
+  display: none;
+}
+
+.app__panel--mobile-hidden {
+  display: none !important;
+}
+
+.week-grid-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.35rem;
+  margin: 0 -0.15rem;
+  scrollbar-gutter: stable;
+}
+
+.week-grid-scroll .week-grid {
+  min-width: 504px;
+}
+
 .app__title {
   font-family: var(--font-display);
   font-size: 1.75rem;
@@ -267,6 +353,7 @@
   position: relative;
   flex: 1;
   min-height: 220px;
+  touch-action: manipulation;
   background: linear-gradient(
     180deg,
     rgba(35, 45, 59, 0.5) 0%,
@@ -366,6 +453,25 @@
 .seg__time {
   font-size: 0.62rem;
   opacity: 0.9;
+}
+
+.seg__move {
+  flex-shrink: 0;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0 0.35rem;
+  margin: 0;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  font-size: 0.62rem;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .job-list {
@@ -604,6 +710,7 @@
 
 .month-grid__drop-track {
   position: relative;
+  touch-action: manipulation;
 }
 
 .month-grid__drop-track--hover {
@@ -618,6 +725,7 @@
   align-items: stretch;
   gap: 0;
   min-width: 0;
+  min-height: 2.75rem;
 }
 
 .month-grid__chip-row--draggable {
@@ -640,14 +748,32 @@
 .month-grid__chip {
   border: 1px solid;
   border-radius: 4px;
-  padding: 0.15rem 0.3rem;
+  padding: 0.25rem 0.35rem;
   font-size: 0.62rem;
   line-height: 1.25;
   cursor: pointer;
   text-align: left;
   flex: 1;
   min-width: 0;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
   overflow: hidden;
+}
+
+.month-grid__chip-move {
+  flex-shrink: 0;
+  min-width: 2.75rem;
+  margin: 0;
+  padding: 0 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 0.55rem;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: stretch;
 }
 
 .month-grid__chip-text {
@@ -687,7 +813,7 @@
 @media (max-width: 960px) {
   .app {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(240px, 1fr) auto;
+    grid-template-rows: auto auto minmax(240px, 1fr);
   }
 
   .app__header {
@@ -695,13 +821,55 @@
     grid-row: 1;
   }
 
-  .app__main {
+  .mobile-tab-bar {
+    display: flex;
     grid-column: 1;
     grid-row: 2;
+    gap: 0.35rem;
+    padding: 0 0.15rem 0.5rem;
+    margin: 0;
+  }
+
+  .mobile-tab-bar__btn {
+    flex: 1;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .mobile-tab-bar__btn--active {
+    border-color: var(--accent);
+    color: var(--text);
+    background: rgba(61, 157, 240, 0.12);
+  }
+
+  .app__main {
+    grid-column: 1;
+    grid-row: 3;
   }
 
   .app__aside {
     grid-column: 1;
     grid-row: 3;
   }
+
+  .job-list {
+    max-height: min(50vh, 320px);
+  }
+}
+
+.app .btn,
+.app .seg__body,
+.app .job-list button,
+.app .mobile-tab-bar__btn,
+.app .month-grid__chip,
+.app .month-grid__chip-move,
+.app .seg__move {
+  -webkit-tap-highlight-color: rgba(61, 157, 240, 0.22);
 }

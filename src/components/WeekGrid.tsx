@@ -22,6 +22,9 @@ export interface WeekGridProps {
     draggedSegmentStartMs: number;
     dropStartMs: number;
   }) => void;
+  /** Show “Move” for drag-capable jobs (touch / coarse pointer). */
+  touchMoveControls?: boolean;
+  onOpenSegmentMove?: (args: { jobId: string; segmentStartMs: number }) => void;
 }
 
 export function WeekGrid({
@@ -31,6 +34,8 @@ export function WeekGrid({
   workSettings,
   onSelectJob,
   onMoveJob,
+  touchMoveControls = false,
+  onOpenSegmentMove,
 }: WeekGridProps) {
   const days = Array.from({ length: 7 }, (_, i) => weekStartMs + i * 86400000);
 
@@ -185,7 +190,7 @@ export function WeekGrid({
                           height: `${Math.max(height, 8)}%`,
                           ...priorityStyle(pri),
                         }}
-                        title={`${job?.title ?? seg.jobId} · ${formatTime(clipStart)}–${formatTime(clipEnd)}${drag ? " — drag to reschedule" : ""}`}
+                        title={`${job?.title ?? seg.jobId} · ${formatTime(clipStart)}–${formatTime(clipEnd)}${drag ? " — drag or Move to reschedule" : ""}`}
                         onDragOver={(e) => onColumnDragOver(e, dayStartMs, isWork)}
                       >
                         <button
@@ -198,6 +203,24 @@ export function WeekGrid({
                             {formatTime(clipStart)} – {formatTime(clipEnd)}
                           </span>
                         </button>
+                        {touchMoveControls &&
+                          drag &&
+                          onOpenSegmentMove && (
+                            <button
+                              type="button"
+                              className="seg__move"
+                              aria-label={`Move ${job?.title ?? "job"} to another time`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenSegmentMove({
+                                  jobId: seg.jobId,
+                                  segmentStartMs: seg.startMs,
+                                });
+                              }}
+                            >
+                              Move
+                            </button>
+                          )}
                       </div>
                     );
                   })

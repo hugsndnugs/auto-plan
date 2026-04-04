@@ -22,6 +22,8 @@ export interface MonthGridProps {
     draggedSegmentStartMs: number;
     dropStartMs: number;
   }) => void;
+  touchMoveControls?: boolean;
+  onOpenSegmentMove?: (args: { jobId: string; segmentStartMs: number }) => void;
 }
 
 export function MonthGrid({
@@ -31,6 +33,8 @@ export function MonthGrid({
   workSettings,
   onSelectJob,
   onMoveJob,
+  touchMoveControls = false,
+  onOpenSegmentMove,
 }: MonthGridProps) {
   const cells = buildMonthGrid(monthStartMs);
 
@@ -174,7 +178,7 @@ export function MonthGrid({
                         style={priorityStyle(pri)}
                         title={
                           drag
-                            ? `${job?.title ?? seg.jobId} — drag to reschedule`
+                            ? `${job?.title ?? seg.jobId} — drag or Move to reschedule`
                             : (job?.title ?? seg.jobId)
                         }
                         onClick={() => onSelectJob(seg.jobId)}
@@ -183,6 +187,24 @@ export function MonthGrid({
                           {job?.title ?? "Job"}
                         </span>
                       </button>
+                      {touchMoveControls &&
+                        drag &&
+                        onOpenSegmentMove && (
+                          <button
+                            type="button"
+                            className="month-grid__chip-move"
+                            aria-label={`Move ${job?.title ?? "job"}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenSegmentMove({
+                                jobId: seg.jobId,
+                                segmentStartMs: seg.startMs,
+                              });
+                            }}
+                          >
+                            Move
+                          </button>
+                        )}
                     </div>
                   );
                 })}
@@ -200,8 +222,9 @@ export function MonthGrid({
         })}
       </div>
       <p className="month-grid__hint">
-        Drag a job block onto another day — vertical position in the cell sets
-        the time of day (same as week view).
+        {touchMoveControls
+          ? "Use Move on a job to pick date and time, or drag on a device that supports it. Vertical drop position sets the time of day (same as week view)."
+          : "Drag a job block onto another day — vertical position in the cell sets the time of day (same as week view)."}
       </p>
     </div>
   );
