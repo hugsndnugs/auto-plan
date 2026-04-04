@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { anchorAfterSegmentMove } from "./dragAnchor";
+import { anchorAfterSegmentMove, segmentDragKey } from "./dragAnchor";
 import type { JobPlacement } from "@/scheduler/types";
 
 const SNAP = 15 * 60 * 1000;
+
+describe("segmentDragKey", () => {
+  it("is stable per job and segment start", () => {
+    expect(segmentDragKey("a", 1)).toBe("a-1");
+    expect(segmentDragKey("a", 1)).toBe(segmentDragKey("a", 1));
+  });
+});
 
 describe("anchorAfterSegmentMove", () => {
   it("shifts first-segment anchor by delta (later drop)", () => {

@@ -5,7 +5,10 @@ import {
   minimumPackStartMs,
   slipKindForPlacement,
 } from "./priorityPolicy";
-import { alignToNextWorkableInstant } from "./workWindows";
+import {
+  alignToNextWorkableInstant,
+  alignToStartOfNextWorkDayAfter,
+} from "./workWindows";
 
 function remainingMinutes(job: Job): number {
   if (job.status === "done" || job.status === "cancelled") return 0;
@@ -64,7 +67,8 @@ export interface PackOptions {
 
 /**
  * Packs active jobs (planned + in_progress) in priority order; within a tier, in-progress first,
- * then anchored before unanchored, FIFO by addedAtMs (then id). Sequential cursor respects anchors.
+ * then anchored before unanchored, FIFO by addedAtMs (then id). After each job, the cursor moves to
+ * the next workday so jobs do not share a wall-calendar day (each job gets its own day(s)).
  */
 export function packJobs(jobs: Job[], options: PackOptions): PackResult {
   const { settings, horizonStartMs, horizonEndMs, nowMs } = options;
@@ -120,7 +124,12 @@ export function packJobs(jobs: Job[], options: PackOptions): PackResult {
     });
 
     if (scheduledEndMs !== null) {
-      cursor = scheduledEndMs;
+      const nextDayStart = alignToStartOfNextWorkDayAfter(
+        scheduledEndMs,
+        settings,
+        horizonEndMs,
+      );
+      cursor = nextDayStart ?? scheduledEndMs;
     }
   }
 

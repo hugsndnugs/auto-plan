@@ -6,6 +6,7 @@ import { formatDayLabel, formatTime } from "@/lib/dates";
 import { priorityStyle } from "@/lib/priorityColor";
 import {
   DRAG_MIME,
+  segmentDragKey,
   setSegmentDragPayload,
   timeAtTrackY,
 } from "@/lib/dragAnchor";
@@ -34,9 +35,11 @@ export function WeekGrid({
   const days = Array.from({ length: 7 }, (_, i) => weekStartMs + i * 86400000);
 
   const [dropHighlightDay, setDropHighlightDay] = useState<number | null>(null);
+  const [draggingSegKey, setDraggingSegKey] = useState<string | null>(null);
 
-  const clearDropHighlight = useCallback(() => {
+  const resetDragUi = useCallback(() => {
     setDropHighlightDay(null);
+    setDraggingSegKey(null);
   }, []);
 
   const canDragJob = useCallback(
@@ -55,6 +58,7 @@ export function WeekGrid({
         jobId: seg.jobId,
         segmentStartMs: seg.startMs,
       });
+      setDraggingSegKey(segmentDragKey(seg.jobId, seg.startMs));
     },
     [canDragJob],
   );
@@ -75,7 +79,7 @@ export function WeekGrid({
       e.preventDefault();
       e.stopPropagation();
       const raw = e.dataTransfer.getData(DRAG_MIME);
-      clearDropHighlight();
+      resetDragUi();
       if (!isWork || !raw) return;
       let parsed: { jobId: string; segmentStartMs: number };
       try {
@@ -102,7 +106,7 @@ export function WeekGrid({
         dropStartMs,
       });
     },
-    [workSettings, onMoveJob, clearDropHighlight],
+    [workSettings, onMoveJob, resetDragUi],
   );
 
   return (
@@ -158,16 +162,18 @@ export function WeekGrid({
                     const job = jobsById.get(seg.jobId);
                     const pri = job?.priority ?? 1;
                     const drag = canDragJob(seg.jobId);
+                    const dKey = segmentDragKey(seg.jobId, seg.startMs);
+                    const isDraggingThisSeg = draggingSegKey === dKey;
 
                     return (
                       <div
                         key={`${seg.jobId}-${seg.startMs}-${dayStartMs}`}
-                        className={`seg${drag ? " seg--draggable" : ""}`}
+                        className={`seg${drag ? " seg--draggable" : ""}${isDraggingThisSeg ? " seg--dragging-source" : ""}`}
                         draggable={drag}
                         onDragStart={(e) => {
                           if (drag) onSegDragStart(e, seg);
                         }}
-                        onDragEnd={clearDropHighlight}
+                        onDragEnd={resetDragUi}
                         style={{
                           top: `${top}%`,
                           height: `${Math.max(height, 8)}%`,

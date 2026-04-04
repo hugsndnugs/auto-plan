@@ -330,6 +330,11 @@
   cursor: grabbing;
 }
 
+/* Hide every calendar fragment for a segment while it is being dragged (week view duplicates per day). */
+.seg--dragging-source {
+  visibility: hidden;
+}
+
 .seg__body {
   flex: 1;
   min-width: 0;

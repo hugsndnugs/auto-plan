@@ -7,7 +7,7 @@ import {
   HIGH_PRIORITY_AUTO_START_OFFSET_MS,
   LOW_PRIORITY_OFFSET_MS,
 } from "./priorityPolicy";
-import { defaultWorkSettings } from "./workWindows";
+import { defaultWorkSettings, startOfLocalDay } from "./workWindows";
 
 const settings: WorkSettings = {
   workStartMinutes: 8 * 60,
@@ -114,7 +114,11 @@ describe("packJobs", () => {
     expect(placements[0].jobId).toBe("urgent");
     expect(placements[1].jobId).toBe("low");
     const uEnd = placements[0].scheduledEndMs!;
-    expect(placements[1].segments[0].startMs).toBeGreaterThanOrEqual(uEnd);
+    const lowStart = placements[1].segments[0].startMs;
+    expect(lowStart).toBeGreaterThanOrEqual(uEnd);
+    expect(startOfLocalDay(lowStart).getTime()).toBeGreaterThan(
+      startOfLocalDay(uEnd).getTime(),
+    );
   });
 
   it("defers low priority without anchor until after the offset window", () => {

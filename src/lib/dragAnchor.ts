@@ -6,8 +6,10 @@ const SNAP_MS = 15 * 60 * 1000;
 
 export const DRAG_MIME = "application/x-autoplan-seg";
 
-const TRANSPARENT_PIXEL =
-  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+/** Stable id for one packed segment row (same job can span multiple calendar columns). */
+export function segmentDragKey(jobId: string, segmentStartMs: number): string {
+  return `${jobId}-${segmentStartMs}`;
+}
 
 /** Hides the default drag image so the source doesn’t look like a duplicate block. */
 export function setSegmentDragPayload(
@@ -18,9 +20,10 @@ export function setSegmentDragPayload(
   if (!dt) return;
   dt.effectAllowed = "move";
   dt.setData(DRAG_MIME, JSON.stringify(payload));
-  const img = new Image();
-  img.src = TRANSPARENT_PIXEL;
-  dt.setDragImage(img, 0, 0);
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  dt.setDragImage(canvas, 0, 0);
 }
 
 export function snapMsToQuarterHour(ms: number): number {

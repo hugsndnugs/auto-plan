@@ -23,6 +23,20 @@ export function getDayWorkBounds(
 }
 
 /**
+ * First instant work can begin on a local calendar day strictly after the day containing `endMs`.
+ * Used when packing sequential jobs so each job occupies its own day(s) without sharing a wall day.
+ */
+export function alignToStartOfNextWorkDayAfter(
+  endMs: number,
+  settings: WorkSettings,
+  horizonEndMs: number,
+): number | null {
+  const dayStart = startOfLocalDay(endMs).getTime();
+  const nextCalendarDayStart = dayStart + 86400000;
+  return alignToNextWorkableInstant(nextCalendarDayStart, settings, horizonEndMs);
+}
+
+/**
  * Earliest instant >= `fromMs` where work can start inside a window, or null if none before horizon.
  */
 export function alignToNextWorkableInstant(
