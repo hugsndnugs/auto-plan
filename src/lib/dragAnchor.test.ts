@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { anchorAfterSegmentMove, segmentDragKey } from "./dragAnchor";
+import {
+  anchorAfterSegmentMove,
+  monthDropStartMs,
+  segmentDragKey,
+} from "./dragAnchor";
 import type { JobPlacement } from "@/scheduler/types";
+import { defaultWorkSettings } from "@/scheduler/workWindows";
 
 const SNAP = 15 * 60 * 1000;
 
@@ -80,5 +85,40 @@ describe("anchorAfterSegmentMove", () => {
       base + 123_456,
     );
     expect(anchor! % SNAP).toBe(0);
+  });
+});
+
+describe("monthDropStartMs", () => {
+  const settings = defaultWorkSettings();
+
+  it("preserves local clock time on the target weekday", () => {
+    const mon = new Date(2026, 3, 6, 10, 30, 0, 0);
+    const wed = new Date(2026, 3, 8, 0, 0, 0, 0);
+    const drop = monthDropStartMs(mon.getTime(), wed.getTime(), settings);
+    const want = new Date(2026, 3, 8, 10, 30, 0, 0).getTime();
+    expect(drop).toBe(want);
+  });
+
+  it("clamps to the last quarter-hour that can start before work end", () => {
+    const mon = new Date(2026, 3, 6, 16, 59, 0, 0);
+    const tue = new Date(2026, 3, 7, 0, 0, 0, 0);
+    const lastStart = new Date(2026, 3, 7, 16, 45, 0, 0).getTime();
+    expect(monthDropStartMs(mon.getTime(), tue.getTime(), settings)).toBe(
+      lastStart,
+    );
+  });
+
+  it("returns null on a non-working target day", () => {
+    const fri = new Date(2026, 3, 10, 10, 0, 0, 0);
+    const sat = new Date(2026, 3, 11, 0, 0, 0, 0);
+    expect(monthDropStartMs(fri.getTime(), sat.getTime(), settings)).toBeNull();
+  });
+
+  it("snaps to 15-minute grid", () => {
+    const mon = new Date(2026, 3, 6, 9, 7, 13, 0);
+    const tue = new Date(2026, 3, 7, 0, 0, 0, 0);
+    const drop = monthDropStartMs(mon.getTime(), tue.getTime(), settings);
+    expect(drop! % SNAP).toBe(0);
+    expect(drop).toBe(new Date(2026, 3, 7, 9, 0, 0, 0).getTime());
   });
 });

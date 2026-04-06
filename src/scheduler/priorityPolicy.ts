@@ -92,3 +92,34 @@ export function slipKindForPlacement(
   }
   return undefined;
 }
+
+/**
+ * After a manual move (drag / datetime dialog), if the new preferred start is outside the
+ * tier’s “weight” window, drop to Normal so the job no longer sorts ahead of other work
+ * on priority alone. Uses the same thresholds as {@link slipKindForPlacement} (anchor as proxy
+ * for first-segment start).
+ */
+export function normalPriorityIfOutsideTierWindow(
+  job: Pick<Job, "priority" | "status">,
+  newAnchorStartMs: number,
+  nowMs: number,
+  addedAtMs: number,
+): Pick<Job, "priority"> | null {
+  if (job.status === "done" || job.status === "cancelled") return null;
+  if (job.priority === 0 || job.priority === 1) return null;
+  if (job.priority === 3) {
+    if (newAnchorStartMs > nowMs + URGENT_FIRST_START_WITHIN_MS) {
+      return { priority: 1 };
+    }
+    return null;
+  }
+  if (job.priority === 2) {
+    const slipThresholdMs =
+      addedAtMs + HIGH_PRIORITY_AUTO_START_OFFSET_MS + HIGH_SLIP_GRACE_MS;
+    if (newAnchorStartMs > slipThresholdMs) {
+      return { priority: 1 };
+    }
+    return null;
+  }
+  return null;
+}

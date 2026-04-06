@@ -1,6 +1,6 @@
 import type { DragEvent as ReactDragEvent } from "react";
 import type { JobPlacement, WorkSettings } from "@/scheduler/types";
-import { getDayWorkBounds } from "@/scheduler/workWindows";
+import { getDayWorkBounds, startOfLocalDay } from "@/scheduler/workWindows";
 
 const SNAP_MS = 15 * 60 * 1000;
 
@@ -62,6 +62,26 @@ export function timeAtTrackY(
   const bounds = getDayWorkBounds(dayStartMs, settings);
   if (!bounds) return null;
   const raw = bounds.startMs + frac * (bounds.endMs - bounds.startMs);
+  const snapped = snapMsToQuarterHour(raw);
+  const lastStart = bounds.endMs - SNAP_MS;
+  return Math.max(bounds.startMs, Math.min(snapped, lastStart));
+}
+
+/**
+ * Month cells stack job chips; pointer Y does not correspond to time of day like the week timeline.
+ * Preserves local clock time from the dragged segment on the target calendar day (snapped, clamped to work bounds).
+ */
+export function monthDropStartMs(
+  draggedSegmentStartMs: number,
+  targetDayStartMs: number,
+  settings: WorkSettings,
+): number | null {
+  const targetMidnight = startOfLocalDay(targetDayStartMs).getTime();
+  const bounds = getDayWorkBounds(targetMidnight, settings);
+  if (!bounds) return null;
+  const srcMidnight = startOfLocalDay(draggedSegmentStartMs).getTime();
+  const offsetFromMidnight = draggedSegmentStartMs - srcMidnight;
+  const raw = targetMidnight + offsetFromMidnight;
   const snapped = snapMsToQuarterHour(raw);
   const lastStart = bounds.endMs - SNAP_MS;
   return Math.max(bounds.startMs, Math.min(snapped, lastStart));

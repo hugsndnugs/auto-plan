@@ -40,6 +40,7 @@ import {
 import {
   HIGH_PRIORITY_AUTO_START_OFFSET_DAYS,
   HIGH_SLIP_GRACE_DAYS,
+  normalPriorityIfOutsideTierWindow,
   URGENT_FIRST_START_WITHIN_MS,
 } from "@/scheduler/priorityPolicy";
 import { MAX_BACKUP_JSON_CHARS } from "@/lib/snapshotValidation";
@@ -244,7 +245,19 @@ export default function App() {
         args.dropStartMs,
       );
       if (anchor === null) return;
-      updateJob(args.jobId, { anchorStartMs: anchor });
+      const nowMove = Date.now();
+      const priorityPatch = normalPriorityIfOutsideTierWindow(
+        job,
+        anchor,
+        nowMove,
+        job.addedAtMs ?? nowMove,
+      );
+      updateJob(
+        args.jobId,
+        priorityPatch
+          ? { anchorStartMs: anchor, ...priorityPatch }
+          : { anchorStartMs: anchor },
+      );
     },
     [jobsById, pack.placements, updateJob],
   );

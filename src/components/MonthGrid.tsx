@@ -1,12 +1,13 @@
 import type { DragEvent, PointerEvent, TouchEvent } from "react";
 import { useCallback, useRef, useState } from "react";
 import type { Job, Segment, WorkSettings } from "@/scheduler/types";
+import { startOfLocalDay } from "@/scheduler/workWindows";
 import { buildMonthGrid } from "@/lib/dates";
 import { priorityStyle } from "@/lib/priorityColor";
 import {
   DRAG_MIME,
+  monthDropStartMs,
   setSegmentDragPayload,
-  timeAtTrackY,
 } from "@/lib/dragAnchor";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -109,12 +110,8 @@ export function MonthGrid({
         return;
       }
 
-      const trackEl = (e.target as HTMLElement).closest(".month-grid__drop-track");
-      if (!trackEl) return;
-      const rect = trackEl.getBoundingClientRect();
-      const dropStartMs = timeAtTrackY(
-        e.clientY,
-        rect,
+      const dropStartMs = monthDropStartMs(
+        parsed.segmentStartMs,
         dayStartMs,
         workSettings,
       );
@@ -168,12 +165,13 @@ export function MonthGrid({
       </div>
       <div className="month-grid__cells">
         {cells.map(({ dayStartMs, inCurrentMonth }) => {
-          const dayEnd = dayStartMs + 86400000;
+          const normalizedDayStart = startOfLocalDay(dayStartMs).getTime();
+          const dayEnd = normalizedDayStart + 86400000;
           const daySegs = segments.filter(
-            (s) => s.endMs > dayStartMs && s.startMs < dayEnd,
+            (s) => s.endMs > normalizedDayStart && s.startMs < dayEnd,
           );
           const isWork =
-            workSettings.workDays[new Date(dayStartMs).getDay()];
+            workSettings.workDays[new Date(normalizedDayStart).getDay()];
 
           const uniqueFirstSeg = new Map<string, Segment>();
           for (const s of daySegs) {
@@ -186,17 +184,19 @@ export function MonthGrid({
               className={`month-grid__cell${!inCurrentMonth ? " month-grid__cell--muted" : ""}${!isWork ? " month-grid__cell--off" : ""}`}
             >
               <div className="month-grid__daynum">
-                {new Date(dayStartMs).getDate()}
+                {new Date(normalizedDayStart).getDate()}
               </div>
               <div
-                className={`month-grid__chips month-grid__drop-track${dropHighlightDay === dayStartMs ? " month-grid__drop-track--hover" : ""}`}
-                onDragOver={(ev) => onCellDragOver(ev, dayStartMs, isWork)}
+                className={`month-grid__chips month-grid__drop-track${dropHighlightDay === normalizedDayStart ? " month-grid__drop-track--hover" : ""}`}
+                onDragOver={(ev) =>
+                  onCellDragOver(ev, normalizedDayStart, isWork)
+                }
                 onDragLeave={(ev) => {
                   if (!ev.currentTarget.contains(ev.relatedTarget as Node)) {
                     setDropHighlightDay(null);
                   }
                 }}
-                onDrop={(ev) => onCellDrop(ev, dayStartMs, isWork)}
+                onDrop={(ev) => onCellDrop(ev, normalizedDayStart, isWork)}
               >
                 {[...uniqueFirstSeg.values()].map((seg) => {
                   const job = jobsById.get(seg.jobId);
@@ -204,14 +204,16 @@ export function MonthGrid({
                   const drag = canDragJob(seg.jobId);
                   return (
                     <div
-                      key={`${seg.jobId}-${dayStartMs}`}
+                      key={`${seg.jobId}-${normalizedDayStart}`}
                       className={`month-grid__chip-row${drag ? " month-grid__chip-row--draggable" : ""}`}
                       draggable={drag}
                       onDragStart={(ev) => {
                         if (drag) onSegDragStart(ev, seg);
                       }}
                       onDragEnd={clearDropHighlight}
-                      onDragOver={(ev) => onCellDragOver(ev, dayStartMs, isWork)}
+                      onDragOver={(ev) =>
+                        onCellDragOver(ev, normalizedDayStart, isWork)
+                      }
                     >
                       <button
                         type="button"
@@ -285,8 +287,8 @@ export function MonthGrid({
       </div>
       <p className="month-grid__hint">
         {touchMoveControls
-          ? "Long-press a job to move it, or drag on a device that supports it. Vertical drop position sets the time of day (same as week view)."
-          : "Drag a job block onto another day — vertical position in the cell sets the time of day (same as week view)."}
+          ? "Long-press a job to move it, or drag on a device that supports it. The target day keeps the job’s clock time (week view still uses vertical position for time)."
+          : "Drag a job chip onto another day — the target day keeps the same clock time as before the move (week view still uses vertical position for time)."}
       </p>
     </div>
   );

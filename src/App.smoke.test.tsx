@@ -37,7 +37,7 @@ describe("App smoke", () => {
     render(<App />);
     fireEvent.click(screen.getAllByRole("button", { name: /month/i })[0]);
     expect(
-      screen.getAllByText(/drag a job block onto another day/i)[0],
+      screen.getAllByText(/drag a job chip onto another day/i)[0],
     ).toBeInTheDocument();
   });
 });

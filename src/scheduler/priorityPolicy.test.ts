@@ -3,7 +3,9 @@ import {
   HIGH_PRIORITY_AUTO_START_OFFSET_MS,
   HIGH_SLIP_GRACE_MS,
   minimumPackStartMs,
+  normalPriorityIfOutsideTierWindow,
   slipKindForPlacement,
+  URGENT_FIRST_START_WITHIN_MS,
 } from "./priorityPolicy";
 import type { Job } from "./types";
 
@@ -81,5 +83,72 @@ describe("slipKindForPlacement", () => {
       "high",
     );
     expect(slipKindForPlacement(2, threshold, nowMs, undefined)).toBeUndefined();
+  });
+});
+
+describe("normalPriorityIfOutsideTierWindow", () => {
+  const nowMs = 1_000_000;
+
+  it("demotes Urgent when new anchor is after urgent window", () => {
+    expect(
+      normalPriorityIfOutsideTierWindow(
+        { priority: 3, status: "planned" },
+        nowMs + URGENT_FIRST_START_WITHIN_MS + 1,
+        nowMs,
+        0,
+      ),
+    ).toEqual({ priority: 1 });
+  });
+
+  it("leaves Urgent when new anchor is inside urgent window", () => {
+    expect(
+      normalPriorityIfOutsideTierWindow(
+        { priority: 3, status: "planned" },
+        nowMs + URGENT_FIRST_START_WITHIN_MS,
+        nowMs,
+        0,
+      ),
+    ).toBeNull();
+  });
+
+  it("demotes High when new anchor is past slip threshold", () => {
+    const addedAt = 100;
+    const threshold =
+      addedAt + HIGH_PRIORITY_AUTO_START_OFFSET_MS + HIGH_SLIP_GRACE_MS;
+    expect(
+      normalPriorityIfOutsideTierWindow(
+        { priority: 2, status: "planned" },
+        threshold + 1,
+        nowMs,
+        addedAt,
+      ),
+    ).toEqual({ priority: 1 });
+    expect(
+      normalPriorityIfOutsideTierWindow(
+        { priority: 2, status: "planned" },
+        threshold,
+        nowMs,
+        addedAt,
+      ),
+    ).toBeNull();
+  });
+
+  it("does not change Normal or finished jobs", () => {
+    expect(
+      normalPriorityIfOutsideTierWindow(
+        { priority: 1, status: "planned" },
+        nowMs + 999 * 86400000,
+        nowMs,
+        0,
+      ),
+    ).toBeNull();
+    expect(
+      normalPriorityIfOutsideTierWindow(
+        { priority: 3, status: "done" },
+        nowMs + 999 * 86400000,
+        nowMs,
+        0,
+      ),
+    ).toBeNull();
   });
 });
