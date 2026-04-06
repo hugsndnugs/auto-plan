@@ -41,7 +41,7 @@ export function MonthGrid({
   const cells = buildMonthGrid(monthStartMs);
 
   const [dropHighlightDay, setDropHighlightDay] = useState<number | null>(null);
-  const longPressTimerRef = useRef<number | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
   const suppressNextSelectRef = useRef(false);
 

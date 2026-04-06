@@ -43,7 +43,7 @@ export function WeekGrid({
 
   const [dropHighlightDay, setDropHighlightDay] = useState<number | null>(null);
   const [draggingSegKey, setDraggingSegKey] = useState<string | null>(null);
-  const longPressTimerRef = useRef<number | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
   const suppressNextSelectRef = useRef(false);
 
