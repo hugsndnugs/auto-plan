@@ -452,33 +452,18 @@
 .seg__title {
   font-size: 0.72rem;
   font-weight: 600;
-  white-space: nowrap;
+  white-space: normal;
   overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   text-overflow: ellipsis;
 }
 
 .seg__time {
   font-size: 0.62rem;
   opacity: 0.9;
-}
-
-.seg__move {
-  flex-shrink: 0;
-  min-width: 2.75rem;
-  min-height: 2.75rem;
-  padding: 0 0.35rem;
-  margin: 0;
-  border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.2);
-  color: inherit;
-  font-size: 0.62rem;
-  font-weight: 600;
-  cursor: pointer;
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .job-list {
@@ -656,12 +641,15 @@
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .month-grid__head {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
+  min-width: 640px;
 }
 
 .month-grid__dow {
@@ -678,6 +666,7 @@
   grid-template-columns: repeat(7, minmax(0, 1fr));
   grid-template-rows: repeat(6, minmax(72px, auto));
   gap: 2px;
+  min-width: 640px;
 }
 
 .month-grid__cell {
@@ -732,7 +721,7 @@
   align-items: stretch;
   gap: 0;
   min-width: 0;
-  min-height: 2.75rem;
+  min-height: 3rem;
 }
 
 .month-grid__chip-row--draggable {
@@ -762,31 +751,19 @@
   text-align: left;
   flex: 1;
   min-width: 0;
-  min-height: 2.75rem;
+  min-height: 3rem;
   display: flex;
   align-items: center;
   overflow: hidden;
 }
 
-.month-grid__chip-move {
-  flex-shrink: 0;
-  min-width: 2.75rem;
-  margin: 0;
-  padding: 0 0.2rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface2);
-  color: var(--text);
-  font-size: 0.55rem;
-  font-weight: 600;
-  cursor: pointer;
-  align-self: stretch;
-}
-
 .month-grid__chip-text {
-  display: block;
-  white-space: nowrap;
+  white-space: normal;
   overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   text-overflow: ellipsis;
 }
 
@@ -871,24 +848,11 @@
   }
 
   .month-grid__chip-row {
-    min-height: 2.25rem;
+    min-height: 2.75rem;
   }
 
   .month-grid__chip {
-    min-height: 2.25rem;
-  }
-
-  .month-grid__chip-move {
-    min-width: 2.125rem;
-    max-width: 2.25rem;
-    padding: 0 0.1rem;
-    font-size: 0.5rem;
-  }
-
-  .seg__move {
-    min-width: 2.125rem;
-    min-height: 2.25rem;
-    font-size: 0.55rem;
+    min-height: 2.75rem;
   }
 }
 
@@ -897,7 +861,6 @@
 .app .job-list button,
 .app .mobile-tab-bar__btn,
 .app .month-grid__chip,
-.app .month-grid__chip-move,
-.app .seg__move {
+.app .seg {
   -webkit-tap-highlight-color: rgba(61, 157, 240, 0.22);
 }

@@ -1,5 +1,5 @@
-import type { CSSProperties, DragEvent } from "react";
-import { useCallback, useState } from "react";
+import type { CSSProperties, DragEvent, PointerEvent, TouchEvent } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Job, Segment, WorkSettings } from "@/scheduler/types";
 import { getDayWorkBounds } from "@/scheduler/workWindows";
 import { formatDayLabel, formatTime } from "@/lib/dates";
@@ -37,14 +37,27 @@ export function WeekGrid({
   touchMoveControls = false,
   onOpenSegmentMove,
 }: WeekGridProps) {
+  const LONG_PRESS_MS = 400;
+  const LONG_PRESS_CANCEL_PX = 10;
   const days = Array.from({ length: 7 }, (_, i) => weekStartMs + i * 86400000);
 
   const [dropHighlightDay, setDropHighlightDay] = useState<number | null>(null);
   const [draggingSegKey, setDraggingSegKey] = useState<string | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressNextSelectRef = useRef(false);
 
   const resetDragUi = useCallback(() => {
     setDropHighlightDay(null);
     setDraggingSegKey(null);
+  }, []);
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      globalThis.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
   }, []);
 
   const canDragJob = useCallback(
@@ -120,6 +133,34 @@ export function WeekGrid({
     [workSettings, onMoveJob, resetDragUi],
   );
 
+  const startLongPressMoveAt = useCallback(
+    (x: number, y: number, seg: Segment, drag: boolean) => {
+      if (!touchMoveControls || !drag || !onOpenSegmentMove) return;
+      clearLongPress();
+      longPressStartRef.current = { x, y };
+      longPressTimerRef.current = globalThis.setTimeout(() => {
+        suppressNextSelectRef.current = true;
+        onOpenSegmentMove({
+          jobId: seg.jobId,
+          segmentStartMs: seg.startMs,
+        });
+        clearLongPress();
+      }, LONG_PRESS_MS);
+    },
+    [clearLongPress, onOpenSegmentMove, touchMoveControls],
+  );
+
+  const continueLongPressMoveAt = useCallback(
+    (x: number, y: number) => {
+      const start = longPressStartRef.current;
+      if (!start || longPressTimerRef.current === null) return;
+      const dx = Math.abs(x - start.x);
+      const dy = Math.abs(y - start.y);
+      if (Math.hypot(dx, dy) > LONG_PRESS_CANCEL_PX) clearLongPress();
+    },
+    [clearLongPress],
+  );
+
   return (
     <div className="week-grid">
       {days.map((dayStartMs) => {
@@ -190,37 +231,58 @@ export function WeekGrid({
                           height: `${Math.max(height, 8)}%`,
                           ...priorityStyle(pri),
                         }}
-                        title={`${job?.title ?? seg.jobId} · ${formatTime(clipStart)}–${formatTime(clipEnd)}${drag ? " — drag or Move to reschedule" : ""}`}
+                        title={`${job?.title ?? seg.jobId} · ${formatTime(clipStart)}–${formatTime(clipEnd)}${drag ? " — drag or long-press to reschedule" : ""}`}
                         onDragOver={(e) => onColumnDragOver(e, dayStartMs, isWork)}
                       >
                         <button
                           type="button"
                           className="seg__body"
-                          onClick={() => onSelectJob(seg.jobId)}
+                          data-testid={`week-seg-body-${seg.jobId}-${seg.startMs}`}
+                          onClick={(e) => {
+                            if (suppressNextSelectRef.current) {
+                              suppressNextSelectRef.current = false;
+                              e.preventDefault();
+                              return;
+                            }
+                            onSelectJob(seg.jobId);
+                          }}
+                          onPointerDown={(e: PointerEvent<HTMLButtonElement>) => {
+                            startLongPressMoveAt(e.clientX, e.clientY, seg, drag);
+                          }}
+                          onPointerMove={(e: PointerEvent<HTMLButtonElement>) => {
+                            continueLongPressMoveAt(e.clientX, e.clientY);
+                          }}
+                          onPointerUp={clearLongPress}
+                          onPointerCancel={clearLongPress}
+                          onTouchStart={(e: TouchEvent<HTMLButtonElement>) => {
+                            const t = e.touches[0];
+                            if (!t) return;
+                            startLongPressMoveAt(t.clientX, t.clientY, seg, drag);
+                          }}
+                          onTouchMove={(e: TouchEvent<HTMLButtonElement>) => {
+                            const t = e.touches[0];
+                            if (!t) return;
+                            continueLongPressMoveAt(t.clientX, t.clientY);
+                          }}
+                          onTouchEnd={clearLongPress}
+                          onTouchCancel={clearLongPress}
+                          onMouseDown={(e) => {
+                            startLongPressMoveAt(e.clientX, e.clientY, seg, drag);
+                          }}
+                          onMouseMove={(e) => {
+                            continueLongPressMoveAt(e.clientX, e.clientY);
+                          }}
+                          onMouseUp={clearLongPress}
+                          onMouseLeave={clearLongPress}
+                          onContextMenu={(e) => {
+                            if (touchMoveControls && drag) e.preventDefault();
+                          }}
                         >
                           <span className="seg__title">{job?.title ?? "Job"}</span>
                           <span className="seg__time">
                             {formatTime(clipStart)} – {formatTime(clipEnd)}
                           </span>
                         </button>
-                        {touchMoveControls &&
-                          drag &&
-                          onOpenSegmentMove && (
-                            <button
-                              type="button"
-                              className="seg__move"
-                              aria-label={`Move ${job?.title ?? "job"} to another time`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenSegmentMove({
-                                  jobId: seg.jobId,
-                                  segmentStartMs: seg.startMs,
-                                });
-                              }}
-                            >
-                              Move
-                            </button>
-                          )}
                       </div>
                     );
                   })

@@ -841,7 +841,7 @@ function JobEditor({
           onChange={(e) => setAnchor(e.target.value)}
         />
         <p className="field-hint">
-          You can also use the Move button on the calendar or drag blocks on a desktop browser.
+          You can also long-press jobs on touch devices, or drag blocks on a desktop browser.
         </p>
       </div>
       <div className="field">

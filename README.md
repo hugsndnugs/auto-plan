@@ -2,7 +2,7 @@
 
 A browser-based job calendar for solo work scheduling. Jobs have **priorities**, **total durations** (including multi-day work in working hours), and a **packing** pass that orders work by priority and sequences it on the timeline. When you **mark a job done early**, remaining work is re-packed automatically.
 
-Use **Week** for the detailed timeline or **Month** for a monthly overview — both support drag-to-reschedule by dragging the job block. The scheduler packs work across a horizon of **six calendar months** from today (or the end of the visible range, whichever is later).
+Use **Week** for the detailed timeline or **Month** for a monthly overview. On desktop, drag a job block to reschedule. On touch devices, long-press a job block/chip to open move mode. The scheduler packs work across a horizon of **six calendar months** from today (or the end of the visible range, whichever is later).
 
 ## Development
 
@@ -45,3 +45,16 @@ To force an absolute base path, set `VITE_BASE_PATH` when building (for example 
 - **Priority insert** adds a job as **Urgent** so it sorts ahead of lower-priority work when the schedule is recomputed.
 - **Finish now** or **Mark done** records an actual end time; completed jobs no longer consume the timeline, so following work moves earlier when possible within the same rules.
 - **Month view**: drag a job block and drop on a day; vertical position in the cell maps to time of day (same idea as the week timeline).
+
+## Mobile QA checklist
+
+Run this checklist on at least one iOS browser and one Android browser before release:
+
+- **Long-press move (week):** long-press a job in week view for ~0.4s and verify move flow opens.
+- **Long-press move (month):** long-press a month chip and verify move flow opens.
+- **No accidental move:** quick tap selects/open job behavior and does not trigger move.
+- **Movement cancel:** press and move finger noticeably before hold threshold; move flow should not open.
+- **Readability:** long titles should show up to 2 lines and remain legible in week and month.
+- **Small widths:** at narrow viewport widths, month view remains usable and job names are still visible.
+- **Touch targets:** chips/segments are comfortably tappable without precision tapping.
+- **Regression:** desktop drag/drop still works in week and month and time-of-day drop mapping is unchanged.

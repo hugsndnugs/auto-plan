@@ -1,5 +1,5 @@
-import type { DragEvent } from "react";
-import { useCallback, useState } from "react";
+import type { DragEvent, PointerEvent, TouchEvent } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Job, Segment, WorkSettings } from "@/scheduler/types";
 import { buildMonthGrid } from "@/lib/dates";
 import { priorityStyle } from "@/lib/priorityColor";
@@ -36,12 +36,25 @@ export function MonthGrid({
   touchMoveControls = false,
   onOpenSegmentMove,
 }: MonthGridProps) {
+  const LONG_PRESS_MS = 400;
+  const LONG_PRESS_CANCEL_PX = 10;
   const cells = buildMonthGrid(monthStartMs);
 
   const [dropHighlightDay, setDropHighlightDay] = useState<number | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressNextSelectRef = useRef(false);
 
   const clearDropHighlight = useCallback(() => {
     setDropHighlightDay(null);
+  }, []);
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      globalThis.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
   }, []);
 
   const canDragJob = useCallback(
@@ -116,6 +129,34 @@ export function MonthGrid({
     [workSettings, onMoveJob, clearDropHighlight],
   );
 
+  const startLongPressMoveAt = useCallback(
+    (x: number, y: number, seg: Segment, drag: boolean) => {
+      if (!touchMoveControls || !drag || !onOpenSegmentMove) return;
+      clearLongPress();
+      longPressStartRef.current = { x, y };
+      longPressTimerRef.current = globalThis.setTimeout(() => {
+        suppressNextSelectRef.current = true;
+        onOpenSegmentMove({
+          jobId: seg.jobId,
+          segmentStartMs: seg.startMs,
+        });
+        clearLongPress();
+      }, LONG_PRESS_MS);
+    },
+    [clearLongPress, onOpenSegmentMove, touchMoveControls],
+  );
+
+  const continueLongPressMoveAt = useCallback(
+    (x: number, y: number) => {
+      const start = longPressStartRef.current;
+      if (!start || longPressTimerRef.current === null) return;
+      const dx = Math.abs(x - start.x);
+      const dy = Math.abs(y - start.y);
+      if (Math.hypot(dx, dy) > LONG_PRESS_CANCEL_PX) clearLongPress();
+    },
+    [clearLongPress],
+  );
+
   return (
     <div className="month-grid">
       <div className="month-grid__head">
@@ -175,36 +216,57 @@ export function MonthGrid({
                       <button
                         type="button"
                         className="month-grid__chip"
+                        data-testid={`month-chip-${seg.jobId}-${seg.startMs}`}
                         style={priorityStyle(pri)}
                         title={
                           drag
-                            ? `${job?.title ?? seg.jobId} — drag or Move to reschedule`
+                            ? `${job?.title ?? seg.jobId} — drag or long-press to reschedule`
                             : (job?.title ?? seg.jobId)
                         }
-                        onClick={() => onSelectJob(seg.jobId)}
+                        onClick={(e) => {
+                          if (suppressNextSelectRef.current) {
+                            suppressNextSelectRef.current = false;
+                            e.preventDefault();
+                            return;
+                          }
+                          onSelectJob(seg.jobId);
+                        }}
+                        onPointerDown={(e: PointerEvent<HTMLButtonElement>) => {
+                          startLongPressMoveAt(e.clientX, e.clientY, seg, drag);
+                        }}
+                        onPointerMove={(e: PointerEvent<HTMLButtonElement>) => {
+                          continueLongPressMoveAt(e.clientX, e.clientY);
+                        }}
+                        onPointerUp={clearLongPress}
+                        onPointerCancel={clearLongPress}
+                        onTouchStart={(e: TouchEvent<HTMLButtonElement>) => {
+                          const t = e.touches[0];
+                          if (!t) return;
+                          startLongPressMoveAt(t.clientX, t.clientY, seg, drag);
+                        }}
+                        onTouchMove={(e: TouchEvent<HTMLButtonElement>) => {
+                          const t = e.touches[0];
+                          if (!t) return;
+                          continueLongPressMoveAt(t.clientX, t.clientY);
+                        }}
+                        onTouchEnd={clearLongPress}
+                        onTouchCancel={clearLongPress}
+                        onMouseDown={(e) => {
+                          startLongPressMoveAt(e.clientX, e.clientY, seg, drag);
+                        }}
+                        onMouseMove={(e) => {
+                          continueLongPressMoveAt(e.clientX, e.clientY);
+                        }}
+                        onMouseUp={clearLongPress}
+                        onMouseLeave={clearLongPress}
+                        onContextMenu={(e) => {
+                          if (touchMoveControls && drag) e.preventDefault();
+                        }}
                       >
                         <span className="month-grid__chip-text">
                           {job?.title ?? "Job"}
                         </span>
                       </button>
-                      {touchMoveControls &&
-                        drag &&
-                        onOpenSegmentMove && (
-                          <button
-                            type="button"
-                            className="month-grid__chip-move"
-                            aria-label={`Move ${job?.title ?? "job"}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenSegmentMove({
-                                jobId: seg.jobId,
-                                segmentStartMs: seg.startMs,
-                              });
-                            }}
-                          >
-                            Move
-                          </button>
-                        )}
                     </div>
                   );
                 })}
@@ -223,7 +285,7 @@ export function MonthGrid({
       </div>
       <p className="month-grid__hint">
         {touchMoveControls
-          ? "Use Move on a job to pick date and time, or drag on a device that supports it. Vertical drop position sets the time of day (same as week view)."
+          ? "Long-press a job to move it, or drag on a device that supports it. Vertical drop position sets the time of day (same as week view)."
           : "Drag a job block onto another day — vertical position in the cell sets the time of day (same as week view)."}
       </p>
     </div>

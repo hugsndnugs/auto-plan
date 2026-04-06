@@ -9,8 +9,9 @@ export default defineConfig({
     alias: { "@": path.resolve(__dirname, "src") },
   },
   test: {
-    environment: "node",
-    include: ["src/**/*.test.ts"],
+    environment: "jsdom",
+    setupFiles: ["./src/test/setupTests.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     env: {
       TZ: "UTC",
     },
